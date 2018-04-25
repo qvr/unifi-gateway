@@ -1,33 +1,36 @@
-# WORK IN PROGRESS, NOT WORKING !!
+# Unifi gateway daemon
 
-# pfSense Unifi gateway plugin
+Forked from https://github.com/stephanlascar/unifi-gateway
 
-I don't know about you guys, but I'm very upset each time I log in the unifi controller. It looks like a conspiracy by Ubiquiti to not show all green circles because you don't buy all the ubuiquiti stuff.
-
-The goal of this plugin is to simulate a UGW router to the Unifi controller.
-
-Things to do:
-- [x] reverse engineering the unifi protocol
-- [ ] create a nice python code
-- [ ] create a plugin for pfSense
-- [ ] add dpi compatibility ?
-
-## Reverse engineering / Proof of concept
-
-You will find in "poc" directory all the necessary to simulate a UGW gateway. It's a **poc**, so please wait the final version if you don't know what you do.  
-
-## Things to install manualy on pfSense router for now on:
-
-- pkg add http://pkg.freebsd.org/freebsd:11:x86:64/latest/All/py27-setuptools-36.5.0.txz
-- pkg add http://pkg.freebsd.org/freebsd:11:x86:64/latest/All/py27-uptime-3.0.1.txz
+The goal of this daemon is to simulate a UGW router to the Unifi controller so your OpenWRT|pfSense|something else router can report stats to the controller.
 
 ## How it works now
 
-Without the definitive pfSense plugin, we have to manualy launch the daemon:
+First adopt the daemon to controller by running:
+
+```bash
+python unifi_gateway.py set-adopt -s http://your.controller/inform
+```
+
+After first run, adopt from controller and run ``set-adopt`` again.
+
+After the daemon has been adopted, you can start the daemon by running:
 
 ```bash
 python unifi_gateway.py start
 ```
+
+(To run in foreground use ``run`` instead of ``start``)
+
+## Hacking it further
+
+This is still in pretty raw state but the basic structure is there:
+
+``unifi_gteway.py`` handles the inform loop and other daemon stuff
+
+``unifi_protocol.py`` does the on-wire formatting and inform template filling
+
+``datacollector.py`` collects the needed data for inform messages and stores it in intermediate format that template fillers then can use. The idea is that this will became modular in the future, so collectors for different platforms (normal linux/OpenWRT/PFSense/etc) could be added easily. For now though the collectors are built-in to the datacollector module.
 
 ## Documentation
 - https://github.com/jk-5/unifi-inform-protocol
