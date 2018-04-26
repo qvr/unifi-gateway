@@ -1,11 +1,15 @@
 # -*- coding: utf-8 -*-
 import time
 import json
+import sys
 from Crypto import Random
 from random import randint
 
 import zlib
-import snappy
+try:
+  import snappy
+except ImportError:
+  pass
 
 from Crypto.Cipher import AES
 from struct import pack, unpack
@@ -24,7 +28,13 @@ def encode_inform(config, data):
     if config.getboolean('gateway', 'is_adopted'):
       key = config.get('gateway', 'key')
 
-    payload = snappy.compress(data)
+    payload = None
+    flags = 3
+    if 'snappy' in sys.modules:
+      payload = snappy.compress(data)
+      flags = 5
+    else:
+      payload = zlib.compress(data)
     pad_len = AES.block_size - (len(payload) % AES.block_size)
     payload += chr(pad_len) * pad_len
     payload = AES.new(a2b_hex(key), AES.MODE_CBC, iv).encrypt(payload)
@@ -33,7 +43,7 @@ def encode_inform(config, data):
     encoded_data = 'TNBU'                     # magic
     encoded_data += pack('>I', 1)             # packet version
     encoded_data += pack('BBBBBB', *(mac_string_2_array(mac)))
-    encoded_data += pack('>H', 5)             # flags
+    encoded_data += pack('>H', flags)         # flags
     encoded_data += iv                        # encryption iv
     encoded_data += pack('>I', 1)             # payload version
     encoded_data += pack('>I', len(payload))  # payload length
