@@ -2,6 +2,7 @@
 import time
 import json
 import sys
+import ast
 from Crypto import Random
 from random import randint
 
@@ -86,14 +87,17 @@ def decode_inform(config, encoded_data):
     return payload_json
 
 
-def _create_partial_inform(config,data):
+def _create_partial_inform(config,dc):
+    ports = ast.literal_eval(config.get('gateway', 'ports'))
+    lan_if = [ d['ifname'] for d in ports if d['name'].lower() == 'lan' ][0]
+
     return json.dumps({
         'hostname': 'UBNT',
         'state': 0,
         'default': 'true',
         'inform_url':  config.get('gateway', 'url'),
-        'mac': config.get('gateway', 'lan_mac'),
-        'ip': config.get('gateway', 'lan_ip'),
+        'mac':  dc.data['macs'][lan_if],
+        'ip': dc.data['ip'][lan_if]['address'],
         'model': config.get('gateway', 'device'),
         'model_display': config.get('gateway', 'device_display'),
         'version': config.get('gateway', 'firmware'),
@@ -101,28 +105,19 @@ def _create_partial_inform(config,data):
     })
 
 
-def _create_complete_inform(config,data):
+def _create_complete_inform(config,dc):
+     ports = ast.literal_eval(config.get('gateway', 'ports'))
+     lan_if = [ d['ifname'] for d in ports if d['name'].lower() == 'lan' ][0]
+     wan_if = [ d['ifname'] for d in ports if d['name'].lower() == 'wan' ][0]
+
      return json.dumps({
          'bootrom_version': 'unknown',
          'cfgversion': config.get('provisioned', 'cfgversion'),
          'config_network_wan': {
              'type': 'dhcp',
          },
-         'config_port_table': [ # XXX TODO read from config?
-             {
-                 'ifname': 'eth0',
-                 'name': 'wan'
-             },
-             {
-                 'ifname': 'eth1',
-                 'name': 'lan'
-             },
-             {
-                 'ifname': 'eth2',
-                 'name': 'LAN2'
-             }
-         ],
-         'connect_request_ip': config.get('gateway', 'lan_ip'),
+         'config_port_table': ports,
+         'connect_request_ip': dc.data['ip'][lan_if]['address'],
          'connect_request_port': '36424',
          'default': False,
          'state': 2,
@@ -138,19 +133,19 @@ def _create_complete_inform(config,data):
          'has_vti': True,
          'hostname': 'openwrt',
          'inform_url':  config.get('gateway', 'url'),
-         'ip': config.get('gateway', 'lan_ip'),
+         'ip': dc.data['ip'][lan_if]['address'],
          'isolated': False,
          'locating': False,
-         'mac': config.get('gateway', 'lan_mac'),
+         'mac': dc.data['macs'][lan_if],
          'model': config.get('gateway', 'device'),
          'model_display': config.get('gateway', 'device_display'),
-         'netmask': '255.255.255.0', # TODO
+         'netmask': dc.data['ip'][lan_if]['netmask'],
          'required_version': '4.0.0',
          'selfrun_beacon': True,
-         'serial': config.get('gateway', 'lan_mac').replace(':', ''),
+         'serial': dc.data['macs'][lan_if].replace(':', ''),
          'version': config.get('gateway', 'firmware'),
          'time': int(time.time()),
-         'uplink': 'eth0', # TODO
+         'uplink': wan_if,
          'uptime': uptime(),
          'pfor-stats': [
              {
@@ -202,10 +197,10 @@ def _create_complete_inform(config,data):
              {
                  'nh': [
                      {
-                         'intf': 'eth0',
+                         'intf': wan_if,
                          'metric': '1/0',
                          't': 'S>*',
-                         'via': '88.114.225.1'
+                         'via': '%s' % dc.data['ip'][wan_if]['gateway']
                      }
                  ],
                  'pfx': '0.0.0.0/0'
@@ -213,20 +208,20 @@ def _create_complete_inform(config,data):
              {
                  'nh': [
                      {
-                         'intf': 'eth1',
+                         'intf': lan_if,
                          't': 'C>*'
                      }
                  ],
-                 'pfx': '192.168.4.0/24'
+                 'pfx': '%s/%s' % (dc.data['ip'][lan_if]['address'], netmask_to_cidr(dc.data['ip'][lan_if]['netmask']))
              },
          ],
-         'network_table': get_network_table(data.data),
-         'if_table': get_if_table(data.data),
+         'network_table': get_network_table(dc.data, ports),
+         'if_table': get_if_table(dc.data, ports),
     })
 
 
-def create_inform(config,data):
-    return _create_partial_inform(config,data) if not config.getboolean('gateway', 'is_adopted') else _create_complete_inform(config,data)
+def create_inform(config,dc):
+    return _create_partial_inform(config,dc) if not config.getboolean('gateway', 'is_adopted') else _create_complete_inform(config,dc)
 
 
 def create_broadcast_message(config, index, version=2, command=6):

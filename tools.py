@@ -17,15 +17,16 @@ def uptime():
     with open('/proc/uptime', 'r') as f:
       return int(float(f.readline().split()[0]))
 
-def get_if_table(data):
-    # XXX FIXME
-    if_list = [ 'eth0', 'eth1' ]
+def get_if_table(data, ports):
+    if_list = [ d['ifname'] for d in ports ]
     if_table = []
 
     if_data = data['ifstat']
 
     for (iface,info) in if_data.items():
       if iface in if_list:
+        if not iface in data['ip']:
+	  continue
         if_entry = {
                  'drops': info["rx_dropped"] + info["tx_dropped"],
                  'enable': True,
@@ -61,13 +62,15 @@ def get_if_table(data):
         if_table.append(if_entry)
     return if_table
 
-def get_network_table(data):
-    # XXX FIXME
-    if_list = [ 'eth0', 'eth1' ]
-    lan_if = 'eth1'
+def get_network_table(data, ports):
+    if_list = [ d['ifname'] for d in ports ]
+    lan_if = [ d['ifname'] for d in ports if d['name'].lower() == 'lan' ][0]
+    wan_if = [ d['ifname'] for d in ports if d['name'].lower() == 'wan' ][0]
     network_table = []
 
     for iface in if_list:
+      if not iface in data['ip']:
+        continue
       net_entry = {
                  'address': '%s/%s' % (data['ip'][iface]['address'], netmask_to_cidr(data['ip'][iface]['netmask'])),
                  'addresses': [
@@ -85,7 +88,7 @@ def get_network_table(data):
              }
       if iface == lan_if:
         net_entry['host_table'] = data['host_table']
-      else:
+      elif iface == wan_if:
         net_entry['gateways'] = [ data['ip'][iface]['gateway'] ]
         net_entry['nameservers'] = data['nameservers']
       network_table.append(net_entry)

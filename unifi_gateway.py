@@ -27,7 +27,7 @@ class UnifiGateway(Daemon):
         self.interval = 10
         self.config = ConfigParser.RawConfigParser()
         self.config.read(CONFIG_FILE)
-        self.datacollector = datacollector.DataCollector()
+        self.datacollector = datacollector.DataCollector(self.config)
 
         Daemon.__init__(self, pidfile=self.config.get('global', 'pid_file'), **kwargs)
 
