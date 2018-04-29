@@ -28,7 +28,7 @@ def get_if_table(data, ports):
         if not iface in data['ip']:
 	  continue
         if_entry = {
-                 'drops': info["rx_dropped"] + info["tx_dropped"],
+                 'drops': int(info["rx_dropped"]) + int(info["tx_dropped"]),
                  'enable': True,
                  'full_duplex': True,
                  'gateways': [
