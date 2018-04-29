@@ -81,6 +81,8 @@ class DataCollector(object):
         (ipaddr, hwtype, flags, hwaddr, mask, iface) = line.split()
 	if not iface in lan_ifs:
 	  continue
+	if flags == '0x0':
+	  continue
 	arp = {}
 	arp['mac'] = hwaddr
 	arp['ip'] = ipaddr
