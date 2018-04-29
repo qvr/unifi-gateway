@@ -19,6 +19,8 @@ def uptime():
 
 def get_if_table(data, ports):
     if_list = [ d['ifname'] for d in ports ]
+    lan_if = [ d['ifname'] for d in ports if d['name'].lower() == 'lan' ][0]
+    wan_if = [ d['ifname'] for d in ports if d['name'].lower() == 'wan' ][0]
     if_table = []
 
     if_data = data['ifstat']
@@ -31,14 +33,10 @@ def get_if_table(data, ports):
                  'drops': int(info["rx_dropped"]) + int(info["tx_dropped"]),
                  'enable': True,
                  'full_duplex': True,
-                 'gateways': [
-                     data['ip'][iface]['gateway'] if 'gateway' in data['ip'][iface] else ''
-                 ],
                  'ip': data['ip'][iface]['address'],
                  'latency': randint(0, 30), # TODO FIXME
                  'mac': data['macs'][iface],
                  'name': iface,
-                 'nameservers': data['nameservers'],
                  'netmask': data['ip'][iface]['netmask'],
                  'num_port': 1,
                  'rx_bytes': info["rx_bytes"],
@@ -56,9 +54,13 @@ def get_if_table(data, ports):
                  'tx_packets': info["tx_packets"],
                  'up': True,
                  'uptime': uptime(),
-                 'xput_down': randint(0, 100), # TODO FIXME
-                 'xput_up': randint(0, 30) # TODO FIXME
+                 'xput_down': 0, # TODO FIXME
+                 'xput_up': 0 # TODO FIXME
              }
+	if iface == wan_if:
+	  if 'gateway' in data['ip'][iface]:
+	    if_entry['gateways'] = [ data['ip'][iface]['gateway'] ]
+	  if_entry['nameservers'] = data['nameservers']
         if_table.append(if_entry)
     return if_table
 
