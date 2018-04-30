@@ -34,7 +34,6 @@ def get_if_table(data, ports):
                  'enable': True,
                  'full_duplex': True,
                  'ip': data['ip'][iface]['address'],
-                 'latency': randint(0, 30), # TODO FIXME
                  'mac': data['macs'][iface],
                  'name': iface,
                  'netmask': data['ip'][iface]['netmask'],
@@ -45,22 +44,24 @@ def get_if_table(data, ports):
                  'rx_multicast': info["rx_multicast"],
                  'rx_packets': info["rx_packets"],
                  'speed': 1000,
-                 'speedtest_lastrun': int(time.time()),
-                 'speedtest_ping': randint(0, 2000),
-                 'speedtest_status': 'Idle',
                  'tx_bytes': info["tx_bytes"],
                  'tx_dropped': info["tx_dropped"],
                  'tx_errors': info["tx_errors"],
                  'tx_packets': info["tx_packets"],
                  'up': True,
-                 'uptime': uptime(),
-                 'xput_down': 0, # TODO FIXME
-                 'xput_up': 0 # TODO FIXME
+                 'uptime': uptime()
              }
 	if iface == wan_if:
 	  if 'gateway' in data['ip'][iface]:
 	    if_entry['gateways'] = [ data['ip'][iface]['gateway'] ]
 	  if_entry['nameservers'] = data['nameservers']
+	  if_entry['latency'] = randint(0, 5) # TODO FIXME
+	  # speedtest results TODO FIXME
+	  if_entry['speedtest_lastrun'] = int(time.time())
+	  if_entry['speedtest_ping'] = randint(0, 2000)
+	  if_entry['speedtest__status'] = 'Idle'
+	  if_entry['xput_down'] = 0
+	  if_entry['xput_up'] = 0
         if_table.append(if_entry)
     return if_table
 
