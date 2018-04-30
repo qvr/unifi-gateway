@@ -70,6 +70,9 @@ class UnifiGateway(Daemon):
               break
             elif response['_type'] == 'httperror':
               pass
+	    elif response['_type'] == 'urlerror':
+	      logger.error('Connection error to controller, retry in 60 seconds: {}'.format(response['msg']))
+	      self.interval = 60
             else:
               logger.warn('Unhandled response type')
             time.sleep(self.interval)
@@ -98,6 +101,9 @@ class UnifiGateway(Daemon):
           if response['code'] == '400':
             logger.error('Authentication to controller failed, indicates wrong authkey, device removed from controller?')
             return
+	if response['_type'] == 'urlerror':
+	  logger.error('Connection error to controller: {}'.format(response['msg']))
+	  return
 
         if response['_type'] == 'setparam':
             if not self.config.getboolean('gateway', 'is_adopted'):
@@ -134,6 +140,8 @@ class UnifiGateway(Daemon):
           response = urllib2.urlopen(request)
         except urllib2.HTTPError, e:
           return { '_type': 'httperror', 'code': str(e.code), 'msg': e.msg }
+	except urllib2.URLError as e:
+	  return { '_type': 'urlerror', 'msg': e.msg }
         return decode_inform(self.config, response.read())
 
     def _save_config(self):
