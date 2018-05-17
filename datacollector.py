@@ -1,12 +1,14 @@
 import re
 import ast
 import time
+import subprocess
 import socket, struct, fcntl
 from random import randint
 
 class DataCollector(object):
   def __init__(self, config):
     self.data = {}
+    self.updated = {}
     self.config = config
     self.ports = ast.literal_eval(config.get('gateway', 'ports'))
 
@@ -18,11 +20,17 @@ class DataCollector(object):
 
   def update(self):
     self.data['ifstat'] = self._update_ifstat_linux()
-    # XXX TODO only update host_table every few minutes
     self.data['dhcp_leases'] = self._update_dnsmasq_leases()
-    self.data['host_table'] = self._get_arp_table_linux()
     self.data['ip'] = self._update_interface_addresses()
     self.data['nameservers'] = [ '195.74.0.47', '195.197.54.100' ]
+
+    if 'latency' not in self.updated or (time.time() - self.updated['latency'] >= 300):
+      self.data['latency'] = self._update_latency()
+      self.updated['latency'] = time.time()
+
+    if 'host_table' not in self.updated or (time.time() - self.updated['host_table'] >= 120):
+      self.data['host_table'] = self._update_iproute2_neighbors_linux()
+      self.updated['host_table'] = time.time()
 
   def _update_ifstat_linux(self):
     ret = {}
@@ -92,6 +100,36 @@ class DataCollector(object):
 	arp_table.append(arp)
     return arp_table
 
+  def _update_iproute2_neighbors_linux(self):
+    neigh_table = []
+    lan_ifs = [ d['ifname'] for d in self.ports if 'lan' in d['name'].lower() ]
+    ip = subprocess.Popen(["ip", "-4", "-s", "neigh", "list"], stdout=subprocess.PIPE)
+
+    for line in ip.stdout.readlines():
+      fields = line.split()
+
+      if fields[-1] == "REACHABLE" or fields[-1] == "STALE":
+        dev_i = fields.index('dev') if 'dev' in fields else None
+        lladdr_i = fields.index('lladdr') if 'lladdr' in fields else None
+        stats_i = fields.index('used') if 'used' in fields else None
+
+        assert dev_i and lladdr_i and stats_i
+
+        if fields[dev_i + 1] in lan_ifs:
+          used,confirmed,updated = [ int(x) for x in fields[stats_i + 1].split('/') ]
+
+          # consider stale neighbor entry as active if it's been used within 2 minutes
+          if fields[-1] == "STALE" and used > 120:
+            continue
+          neigh = {}
+          neigh['mac'] = fields[lladdr_i + 1]
+          neigh['ip'] = fields[0]
+          dhcp_hostname = [ d['hostname'] for d in self.data['dhcp_leases'] if 'hostname' in d and d['mac'].lower() == fields[lladdr_i + 1] ]
+          if dhcp_hostname:
+            neigh['hostname'] = dhcp_hostname[0]
+          neigh_table.append(neigh)
+    return neigh_table
+
   def _get_default_route_linux(self):
     with open("/proc/net/route") as f:
       for line in f:
@@ -130,3 +168,18 @@ class DataCollector(object):
     for d in self.ports:
       ret[d['ifname']] = open('/sys/class/net/%s/address' % d['ifname'],'r').read().strip()
     return ret
+
+  def _update_latency(self):
+    stdout = subprocess.Popen(["/bin/ping", "-c1", "-w5", "ping.ubnt.com"], stdout=subprocess.PIPE).stdout.read()
+    match = re.search('([\d]*\.[\d]*)/([\d]*\.[\d]*)/([\d]*\.[\d]*)', stdout)
+    if not match:
+      return None
+    ping_min = match.group(1)
+    ping_avg = match.group(2)
+    ping_max = match.group(3)
+
+    match = re.search('(\d*)% packet loss', stdout)
+    if not match:
+      return None
+    pkt_loss = match.group(1)
+    return float(ping_avg)

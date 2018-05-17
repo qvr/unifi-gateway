@@ -55,10 +55,10 @@ def get_if_table(data, ports):
 	  if 'gateway' in data['ip'][iface]:
 	    if_entry['gateways'] = [ data['ip'][iface]['gateway'] ]
 	  if_entry['nameservers'] = data['nameservers']
-	  if_entry['latency'] = randint(0, 5) # TODO FIXME
+	  if_entry['latency'] = data['latency']
 	  # speedtest results TODO FIXME
 	  if_entry['speedtest_lastrun'] = int(time.time())
-	  if_entry['speedtest_ping'] = randint(0, 2000)
+	  if_entry['speedtest_ping'] = data['latency']
 	  if_entry['speedtest__status'] = 'Idle'
 	  if_entry['xput_down'] = 0
 	  if_entry['xput_up'] = 0
