@@ -1,6 +1,8 @@
 import re
 import ast
 import time
+import json
+import os.path
 import subprocess
 import socket, struct, fcntl
 from random import randint
@@ -22,7 +24,8 @@ class DataCollector(object):
     self.data['ifstat'] = self._update_ifstat_linux()
     self.data['dhcp_leases'] = self._update_dnsmasq_leases()
     self.data['ip'] = self._update_interface_addresses()
-    self.data['nameservers'] = [ '195.74.0.47', '195.197.54.100' ]
+    self.data['nameservers'] = [ '195.74.0.47', '195.197.54.100' ] # XXX TODO FIXME
+    self.data['speedtest'] = self._update_speedtest_cli_results()
 
     if 'latency' not in self.updated or (time.time() - self.updated['latency'] >= 300):
       self.data['latency'] = self._update_latency()
@@ -118,8 +121,8 @@ class DataCollector(object):
         if fields[dev_i + 1] in lan_ifs:
           used,confirmed,updated = [ int(x) for x in fields[stats_i + 1].split('/') ]
 
-          # consider stale neighbor entry as active if it's been used within 2 minutes
-          if fields[-1] == "STALE" and used > 120:
+          # consider stale neighbor entry as active if it's been used within 5 minutes
+          if fields[-1] == "STALE" and used > 300:
             continue
           neigh = {}
           neigh['mac'] = fields[lladdr_i + 1]
@@ -183,3 +186,16 @@ class DataCollector(object):
       return None
     pkt_loss = match.group(1)
     return float(ping_avg)
+
+  def _update_speedtest_cli_results(self):
+    results_file = "./speedtest.json"
+    noresult = { 'lastrun': 0, 'ping': 0, 'upload': 0, 'download': 0 }
+
+    try:
+      ts = os.path.getmtime(results_file)
+      with open(results_file) as json_data:
+        sp = json.load(json_data)
+    except:
+      return noresult
+
+    return { 'lastrun': int(ts), 'ping': sp['ping'], 'upload': sp['upload']/1024/1024, 'download': sp['download']/1024/1024 }

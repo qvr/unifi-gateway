@@ -147,26 +147,17 @@ def _create_complete_inform(config,dc):
          'time': int(time.time()),
          'uplink': wan_if,
          'uptime': uptime(),
-         'pfor-stats': [
-             {
-                 'id': '596add99e4b0a76e35003e00',
-                 'rx_bytes': 0,
-                 'rx_packets': 0,
-                 'tx_bytes': 0,
-                 'tx_packets': 0
-             }
-         ],
+         'pfor-stats': [],
          'speedtest-status': {
-         # XXX TODO speedtest (ping?)
-             'latency': 9,
-             'rundate': int(time.time()),
+             'latency': int(dc.data['speedtest']['ping']),
+             'rundate': dc.data['speedtest']['lastrun'],
              'runtime': 6,
              'status_download': 2,
              'status_ping': 2,
              'status_summary': 2,
              'status_upload': 2,
-             'xput_download': 385.30819702148,
-             'xput_upload': 68.445808410645
+             'xput_download': dc.data['speedtest']['download'],
+             'xput_upload': dc.data['speedtest']['upload']
          },
          "ddns-status": {
          # XXX TODO dyndns
