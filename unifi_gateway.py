@@ -62,6 +62,13 @@ class UnifiGateway(Daemon):
               # speed-test
               # set-locate
               # unset-locate
+	    elif response['_type'] == 'upgrade':
+	      logger.info('Received upgrade request to version {}'.format(response['version']))
+	      if response['version'] != self.config.get('gateway', 'firmware'):
+	        self.config.set('gateway', 'previous_firmware', self.config.get('gateway', 'firmware'))
+	        self.config.set('gateway', 'firmware', response['version'])
+                self._save_config()
+		logger.info('New version information stored')
             elif response['_type'] == 'setdefault':
               logger.critical('Controller requested device reset, removing authkey and adopted state')
               self.config.set('gateway', 'is_adopted', False)
