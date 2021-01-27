@@ -6,7 +6,13 @@ The goal of this daemon is to simulate a UGW router to the Unifi controller so y
 
 ## How it works now
 
-First adopt the daemon to controller by running:
+First change conf/unifi-gateway.conf to yours
+```bash
+lan_ip = 192.168.4.1
+lan_mac = 0a:0a:0a:0a:0a:0a
+```
+
+Then adopt the daemon to controller by running:
 
 ```bash
 python unifi_gateway.py set-adopt -s http://your.controller/inform
@@ -26,7 +32,7 @@ python unifi_gateway.py start
 
 This is still in pretty raw state but the basic structure is there:
 
-``unifi_gteway.py`` handles the inform loop and other daemon stuff
+``unifi_gateway.py`` handles the inform loop and other daemon stuff
 
 ``unifi_protocol.py`` does the on-wire formatting and inform template filling
 
