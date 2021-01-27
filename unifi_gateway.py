@@ -132,6 +132,7 @@ class UnifiGateway(Daemon):
           if s[0] == 'authkey':
             logger.debug('setting new device authkey received in mgmt_cfg')
             self.config.set('provisioned', 'key', s[1])
+            self.config.set('gateway', 'key', s[1])
 
 
     def _send_inform(self, data):
