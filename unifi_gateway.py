@@ -137,8 +137,10 @@ class UnifiGateway(Daemon):
 
     def _send_inform(self, data):
         headers = {
+            'Accept': '*/*',
             'Content-Type': 'application/x-binary',
-            'User-Agent': 'AirControl Agent v1.0'
+            'User-Agent': 'AirControl Agent v1.0',
+            'Expect': '100-continue'         
         }
         url = self.config.get('gateway', 'url')
 

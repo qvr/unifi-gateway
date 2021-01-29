@@ -22,7 +22,7 @@ from tools import mac_string_2_array, ip_string_2_array, netmask_to_cidr, uptime
 
 MASTER_KEY = "ba86f2bbe107c7c57eb5f2690775c712"
 
-def encode_inform(config, data):
+def encode_inform(config, data, encryption='GCM'):
     iv = Random.new().read(16)
 
     key = MASTER_KEY
@@ -31,23 +31,43 @@ def encode_inform(config, data):
 
     payload = None
     flags = 3
+    mac = config.get('gateway','lan_mac')
+
+    if encryption == 'GCM':
+        flags = flags | 0x01 | 0x08
+    elif encryption == 'CBC':
+        flags = flags | 0x01
+
     if 'snappy' in sys.modules:
       payload = snappy.compress(data)
       flags = 5
     else:
       payload = zlib.compress(data)
-    pad_len = AES.block_size - (len(payload) % AES.block_size)
-    payload += chr(pad_len) * pad_len
-    payload = AES.new(a2b_hex(key), AES.MODE_CBC, iv).encrypt(payload)
-    mac = config.get('gateway','lan_mac')
 
+    # encode packet
     encoded_data = 'TNBU'                     # magic
     encoded_data += pack('>I', 1)             # packet version
     encoded_data += pack('BBBBBB', *(mac_string_2_array(mac)))
     encoded_data += pack('>H', flags)         # flags
     encoded_data += iv                        # encryption iv
     encoded_data += pack('>I', 1)             # payload version
-    encoded_data += pack('>I', len(payload))  # payload length
+    #encoded_data += payload
+
+    if encryption == 'GCM':
+        # GCM Encryption
+        #logger.debug(f'encode_indorm: AES GCM Encrypting packet using key {key} and iv {hexlify(iv)}')
+        encoded_data += pack('>I', len(payload)+16)  # payload length
+        _aes = AES.new(a2b_hex(key), AES.MODE_GCM, iv)
+        _aes.update(encoded_data)
+        payload, tag = _aes.encrypt_and_digest(payload)
+        payload += tag
+
+    elif encryption == 'CBC':
+        pad_len = AES.block_size - (len(payload) % AES.block_size)
+        payload += chr(pad_len) * pad_len
+        payload = AES.new(a2b_hex(key), AES.MODE_CBC, iv).encrypt(payload)
+        encoded_data += pack('>I', len(payload))  # payload length
+
     encoded_data += payload
 
     return encoded_data
@@ -62,23 +82,40 @@ def decode_inform(config, encoded_data):
     # if mac != (0x00, 0x0d, 0xb9, 0x47, 0x65, 0xf9):
     #     raise Exception('Mac address changed in response: %s -> %s'%(mac2a((0x00, 0x0d, 0xb9, 0x47, 0x65, 0xf9)), mac2a(mac)))
 
+    header = encoded_data[:40]
+    version = bytes(unpack('>I', encoded_data[4:8]))
+    mac = bytes(unpack('BBBBBB', encoded_data[8:14]))
     flags = unpack('>H', encoded_data[14:16])[0]
     iv = encoded_data[16:32]
-    version = unpack('>I', encoded_data[32:36])[0]
+    payload_ver = unpack('>I', encoded_data[32:36])[0]
     payload_len = unpack('>I', encoded_data[36:40])[0]
     payload = encoded_data[40:(40+payload_len)]
+
+    flag = {
+        'encrypted': bool(flags & 0x01),
+        'zlibCompressed': bool(flags & 0x02),
+        'SnappyCompression': bool(flags & 0x04),
+        'encryptedGCM': bool(flags & 0x08),
+    }
 
     key = MASTER_KEY
     if config.getboolean('gateway', 'is_adopted'):
       key = config.get('gateway', 'key')
 
     # decrypt if required
-    if flags & 0x01:
-        payload = AES.new(a2b_hex(key), AES.MODE_CBC, iv).decrypt(payload)
-        pad_size = ord(payload[-1])
-        if pad_size > AES.block_size:
-            raise Exception('Response not padded or padding is corrupt')
-        payload = payload[:(len(payload) - pad_size)]
+    if flag['encrypted']:
+        if flag['encryptedGCM']:
+            tag = payload[-16:]
+            payload = payload[:-16]
+            _aes = AES.new(a2b_hex(key), AES.MODE_GCM, iv)
+            _aes.update(header)
+            payload = _aes.decrypt_and_verify(payload, tag)
+        else:
+            payload = AES.new(a2b_hex(key), AES.MODE_CBC, iv).decrypt(payload)
+            pad_size = ord(payload[-1])
+            if pad_size > AES.block_size:
+                raise Exception('Response not padded or padding is corrupt')
+            payload = payload[:(len(payload) - pad_size)]
     # uncompress if required
     if flags & 0x02:
         payload = zlib.decompress(payload)
