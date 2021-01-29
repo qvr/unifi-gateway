@@ -133,9 +133,13 @@ class UnifiGateway(Daemon):
             logger.debug('setting new device authkey received in mgmt_cfg')
             self.config.set('provisioned', 'key', s[1])
             self.config.set('gateway', 'key', s[1])
+   #####TO Do Self test with CBC or GCM encryption
+          if s[0] == 'use_aes_gcm':
+            self.config.set('gateway', 'use_aes_gcm', True)
+          else:
+            self.config.set('gateway', 'use_aes_gcm', False)
 
-
-    def _send_inform(self, data):
+    def _send_inform(self, data, encryption='CBC'):
         headers = {
             'Accept': '*/*',
             'Content-Type': 'application/x-binary',
@@ -144,7 +148,7 @@ class UnifiGateway(Daemon):
         }
         url = self.config.get('gateway', 'url')
 
-        request = urllib2.Request(url, encode_inform(self.config, data), headers)
+        request = urllib2.Request(url, encode_inform(self.config, data, encryption=encryption), headers)
         logger.debug('Send inform request to {} : {}'.format(url, data))
         try:
           response = urllib2.urlopen(request)

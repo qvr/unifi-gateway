@@ -22,12 +22,14 @@ from tools import mac_string_2_array, ip_string_2_array, netmask_to_cidr, uptime
 
 MASTER_KEY = "ba86f2bbe107c7c57eb5f2690775c712"
 
-def encode_inform(config, data, encryption='GCM'):
+def encode_inform(config, data, encryption='CBC'):
     iv = Random.new().read(16)
 
     key = MASTER_KEY
     if config.getboolean('gateway', 'is_adopted'):
       key = config.get('gateway', 'key')
+      if config.getboolean('gateway', 'use_aes_gcm'):
+         encryption = 'GCM'
 
     payload = None
     flags = 3
