@@ -30,6 +30,8 @@ def encode_inform(config, data, encryption='CBC'):
       key = config.get('gateway', 'key')
       if config.getboolean('gateway', 'use_aes_gcm'):
          encryption = 'GCM'
+      elif not config.getboolean('gateway', 'use_aes_gcm'):
+         encryption = 'CBC'
 
     payload = None
     flags = 3
@@ -245,7 +247,7 @@ def _create_complete_inform(config,dc):
                  'pfx': '%s/%s' % (dc.data['ip'][lan_if]['address'], netmask_to_cidr(dc.data['ip'][lan_if]['netmask']))
              },
          ],
-         'network_table': get_network_table(dc.data, ports),
+         #'network_table': get_network_table(dc.data, ports),
          'if_table': get_if_table(dc.data, ports),
     })
 
