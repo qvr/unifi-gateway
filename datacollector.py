@@ -90,17 +90,17 @@ class DataCollector(object):
       header_line = f.readline()
       for line in f:
         (ipaddr, hwtype, flags, hwaddr, mask, iface) = line.split()
-	if not iface in lan_ifs:
-	  continue
-	if flags == '0x0':
-	  continue
-	arp = {}
-	arp['mac'] = hwaddr
-	arp['ip'] = ipaddr
-	dhcp_hostname = [ d['hostname'] for d in self.data['dhcp_leases'] if 'hostname' in d and d['mac'].lower() == hwaddr ]
-	if dhcp_hostname:
-	  arp['hostname'] = dhcp_hostname[0]
-	arp_table.append(arp)
+        if not iface in lan_ifs:
+          continue
+        if flags == '0x0':
+          continue
+        arp = {}
+        arp['mac'] = hwaddr
+        arp['ip'] = ipaddr
+        _hostname = [ d['hostname'] for d in self.data['dhcp_leases'] if 'hostname' in d and d['mac'].lower() == hwaddr ]
+        if dhcp_hostname:
+          arp['hostname'] = dhcp_hostname[0]
+        arp_table.append(arp)
     return arp_table
 
   def _update_iproute2_neighbors_linux(self):
@@ -109,7 +109,7 @@ class DataCollector(object):
     ip = subprocess.Popen(["ip", "-4", "-s", "neigh", "list"], stdout=subprocess.PIPE)
 
     for line in ip.stdout.readlines():
-      fields = line.split()
+      fields = line.decode('utf-8').split()
 
       if fields[-1] == "REACHABLE" or fields[-1] == "STALE":
         dev_i = fields.index('dev') if 'dev' in fields else None
@@ -122,7 +122,7 @@ class DataCollector(object):
           used,confirmed,updated = [ int(x) for x in fields[stats_i + 1].split('/') ]
 
           # consider stale neighbor entry as active if it's been used within 5 minutes
-          if fields[-1] == "STALE" and used > 300:
+          if fields[-1] == "STALE" and used > 240:
             continue
           neigh = {}
           neigh['mac'] = fields[lladdr_i + 1]
@@ -137,10 +137,10 @@ class DataCollector(object):
     with open("/proc/net/route") as f:
       for line in f:
         fields = line.strip().split()
-	if fields[1] != '00000000' or not int(fields[3], 16) & 2:
-	  continue
+        if fields[1] != '00000000' or not int(fields[3], 16) & 2:
+          continue
 
-	return socket.inet_ntoa(struct.pack("<L", int(fields[2], 16)))
+        return socket.inet_ntoa(struct.pack("<L", int(fields[2], 16)))
 
   def _update_interface_addresses(self):
     ret = {}
@@ -160,8 +160,8 @@ class DataCollector(object):
     addr = None
     mask = None
     try:
-      addr = socket.inet_ntoa(fcntl.ioctl(s.fileno(), 0x8915, struct.pack('256s', iface[:15]))[20:24])
-      mask = socket.inet_ntoa(fcntl.ioctl(s.fileno(), 35099, struct.pack('256s', iface))[20:24])
+      addr = socket.inet_ntoa(fcntl.ioctl(s.fileno(), 0x8915, struct.pack('256s', bytes(iface[:15], 'utf-8')))[20:24])
+      mask = socket.inet_ntoa(fcntl.ioctl(s.fileno(), 35099, struct.pack('256s', bytes(iface, 'utf-8')))[20:24])
     except:
       pass
     return [ addr, mask ]
@@ -174,14 +174,14 @@ class DataCollector(object):
 
   def _update_latency(self):
     stdout = subprocess.Popen(["/bin/ping", "-c1", "-w5", "ping.ubnt.com"], stdout=subprocess.PIPE).stdout.read()
-    match = re.search('([\d]*\.[\d]*)/([\d]*\.[\d]*)/([\d]*\.[\d]*)', stdout)
+    match = re.search('([\d]*\.[\d]*)/([\d]*\.[\d]*)/([\d]*\.[\d]*)', stdout.decode('utf-8'))
     if not match:
       return None
     ping_min = match.group(1)
     ping_avg = match.group(2)
     ping_max = match.group(3)
 
-    match = re.search('(\d*)% packet loss', stdout)
+    match = re.search('(\d*)% packet loss', stdout.decode('utf-8'))
     if not match:
       return None
     pkt_loss = match.group(1)

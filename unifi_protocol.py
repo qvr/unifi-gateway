@@ -43,13 +43,13 @@ def encode_inform(config, data, encryption='CBC'):
         flags = flags | 0x01
 
     if 'snappy' in sys.modules:
-      payload = snappy.compress(data)
+      payload = snappy.compress(data.encode('ascii'))
       flags = 5
     else:
-      payload = zlib.compress(data)
+      payload = zlib.compress(data.encode('ascii'))
 
     # encode packet
-    encoded_data = 'TNBU'                     # magic
+    encoded_data = b'TNBU'                     # magic
     encoded_data += pack('>I', 1)             # packet version
     encoded_data += pack('BBBBBB', *(mac_string_2_array(mac)))
     encoded_data += pack('>H', flags)         # flags
@@ -68,7 +68,7 @@ def encode_inform(config, data, encryption='CBC'):
 
     elif encryption == 'CBC':
         pad_len = AES.block_size - (len(payload) % AES.block_size)
-        payload += chr(pad_len) * pad_len
+        payload += chr(pad_len).encode('ascii') * pad_len
         payload = AES.new(a2b_hex(key), AES.MODE_CBC, iv).encrypt(payload)
         encoded_data += pack('>I', len(payload))  # payload length
 
@@ -79,7 +79,7 @@ def encode_inform(config, data, encryption='CBC'):
 
 def decode_inform(config, encoded_data):
     magic = encoded_data[0:4]
-    if magic != 'TNBU':
+    if magic != b'TNBU':
         raise Exception("Missing magic in response: '{}' instead of 'TNBU'".format(magic))
 
     # mac = unpack('BBBBBB', encoded_data[8:14])
@@ -116,7 +116,7 @@ def decode_inform(config, encoded_data):
             payload = _aes.decrypt_and_verify(payload, tag)
         else:
             payload = AES.new(a2b_hex(key), AES.MODE_CBC, iv).decrypt(payload)
-            pad_size = ord(payload[-1])
+            pad_size = payload[-1]
             if pad_size > AES.block_size:
                 raise Exception('Response not padded or padding is corrupt')
             payload = payload[:(len(payload) - pad_size)]
@@ -247,7 +247,7 @@ def _create_complete_inform(config,dc):
                  'pfx': '%s/%s' % (dc.data['ip'][lan_if]['address'], netmask_to_cidr(dc.data['ip'][lan_if]['netmask']))
              },
          ],
-         #'network_table': get_network_table(dc.data, ports),
+         'network_table': get_network_table(dc.data, ports),
          'if_table': get_if_table(dc.data, ports),
     })
 

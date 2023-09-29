@@ -28,7 +28,7 @@ def get_if_table(data, ports):
     for (iface,info) in if_data.items():
       if iface in if_list:
         if not iface in data['ip']:
-	  continue
+          continue
         if_entry = {
                  'drops': int(info["rx_dropped"]) + int(info["tx_dropped"]),
                  'enable': True,
@@ -51,16 +51,16 @@ def get_if_table(data, ports):
                  'up': True,
                  'uptime': uptime()
              }
-	if iface == wan_if:
-	  if 'gateway' in data['ip'][iface]:
-	    if_entry['gateways'] = [ data['ip'][iface]['gateway'] ]
-	  if_entry['nameservers'] = data['nameservers']
-	  if_entry['latency'] = data['latency']
-	  if_entry['speedtest_lastrun'] = data['speedtest']['lastrun']
-	  if_entry['speedtest_ping'] = data['speedtest']['ping']
-	  if_entry['speedtest_status'] = 'Idle'
-	  if_entry['xput_down'] = data['speedtest']['download']
-	  if_entry['xput_up'] = data['speedtest']['upload']
+        if iface == wan_if:
+          if 'gateway' in data['ip'][iface]:
+            if_entry['gateways'] = [ data['ip'][iface]['gateway'] ]
+          if_entry['nameservers'] = data['nameservers']
+          if_entry['latency'] = data['latency']
+          if_entry['speedtest_lastrun'] = data['speedtest']['lastrun']
+          if_entry['speedtest_ping'] = data['speedtest']['ping']
+          if_entry['speedtest_status'] = 'Idle'
+          if_entry['xput_down'] = data['speedtest']['download']
+          if_entry['xput_up'] = data['speedtest']['upload']
         if_table.append(if_entry)
     return if_table
 
