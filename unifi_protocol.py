@@ -130,7 +130,7 @@ def decode_inform(config, encoded_data):
 
 def _create_partial_inform(config,dc):
     ports = ast.literal_eval(config.get('gateway', 'ports'))
-    lan_if = [ d['ifname'] for d in ports if d['name'].lower() == 'lan' ][0]
+    lan_if = [ d['ifname'] for d in ports if d['type'].lower() == 'lan' ][0]
 
     return json.dumps({
         'hostname': 'UBNT',
@@ -148,8 +148,8 @@ def _create_partial_inform(config,dc):
 
 def _create_complete_inform(config,dc):
      ports = ast.literal_eval(config.get('gateway', 'ports'))
-     lan_if = [ d['ifname'] for d in ports if d['name'].lower() == 'lan' ][0]
-     wan_if = [ d['ifname'] for d in ports if d['name'].lower() == 'wan' ][0]
+     lan_if = [ d['ifname'] for d in ports if d['type'].lower() == 'lan' ][0]
+     wan_if = [ d['ifname'] for d in ports if d['type'].lower() == 'wan' ][0]
 
      return json.dumps({
          'bootrom_version': 'unknown',
@@ -175,6 +175,7 @@ def _create_complete_inform(config,dc):
          'hostname': 'openwrt',
          'inform_url':  config.get('gateway', 'url'),
          'ip': dc.data['ip'][lan_if]['address'],
+         'ipv4_active_leases': [],
          'isolated': False,
          'locating': False,
          'mac': dc.data['macs'][lan_if],

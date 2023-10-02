@@ -26,6 +26,7 @@ class DataCollector(object):
     self.data['ip'] = self._update_interface_addresses()
     self.data['nameservers'] = [ '195.74.0.47', '195.197.54.100' ] # XXX TODO FIXME
     self.data['speedtest'] = self._update_speedtest_cli_results()
+    self.updated['general'] = time.time()
 
     if 'latency' not in self.updated or (time.time() - self.updated['latency'] >= 300):
       self.data['latency'] = self._update_latency()
@@ -45,6 +46,11 @@ class DataCollector(object):
     for line in lines[2:]:
       if line.find(":") < 0: continue
       iface, data = line.split(":")
+      ifname = [ d['ifname'] for d in self.ports if d['realif'].lower() == iface.lstrip() ]
+      if len(ifname) > 0:
+        ifname = ifname[0]
+      else:
+        continue
       columns = data.split()
 
       info                  = {}
@@ -56,6 +62,10 @@ class DataCollector(object):
       info["rx_frame"]      = columns[5]
       info["rx_compressed"] = columns[6]
       info["rx_multicast"]  = columns[7]
+      if 'ifstat' in self.data:
+        info["rx_bps"]        = int((int(columns[0]) - int(self.data['ifstat'][ifname]["rx_bytes"])) / (time.time() - self.updated['general']))
+      else:
+        info["rx_bps"]      = 0
 
       info["tx_bytes"]      = columns[8]
       info["tx_packets"]    = columns[9]
@@ -65,8 +75,12 @@ class DataCollector(object):
       info["tx_frame"]      = columns[13]
       info["tx_compressed"] = columns[14]
       info["tx_multicast"]  = columns[15]
+      if 'ifstat' in self.data:
+        info["tx_bps"]        = int((int(columns[8]) - int(self.data['ifstat'][ifname]["tx_bytes"])) / (time.time() - self.updated['general']))
+      else:
+        info["tx_bps"]      = 0
 
-      ret[iface.lstrip()] = info
+      ret[ifname] = info
     return ret
 
   def _update_dnsmasq_leases(self):
@@ -80,6 +94,7 @@ class DataCollector(object):
           lease['hostname'] = name
         lease['ip'] = ip
         lease['mac'] = mac
+        lease['expiry'] = expiry
         leases.append(lease)
     return leases
 
@@ -105,7 +120,7 @@ class DataCollector(object):
 
   def _update_iproute2_neighbors_linux(self):
     neigh_table = []
-    lan_ifs = [ d['ifname'] for d in self.ports if 'lan' in d['name'].lower() ]
+    lan_ifs = [ d['realif'] for d in self.ports if 'lan' in d['name'].lower() ]
     ip = subprocess.Popen(["ip", "-4", "-s", "neigh", "list"], stdout=subprocess.PIPE)
 
     for line in ip.stdout.readlines():
@@ -145,10 +160,10 @@ class DataCollector(object):
   def _update_interface_addresses(self):
     ret = {}
     for d in self.ports:
-      ( ip, mask ) = self._get_interface_address(d['ifname'])
+      ( ip, mask ) = self._get_interface_address(d['realif'])
       if not ip or not mask:
         continue
-      if d['name'].lower() == 'wan':
+      if d['type'].lower() == 'wan':
         ret[d['ifname']] = { 'address': ip, 'netmask': mask, 'gateway': self._get_default_route_linux() }
       else:
         ret[d['ifname']] = { 'address': ip, 'netmask': mask }
@@ -169,7 +184,7 @@ class DataCollector(object):
   def _update_interface_macs_linux(self):
     ret = {}
     for d in self.ports:
-      ret[d['ifname']] = open('/sys/class/net/%s/address' % d['ifname'],'r').read().strip()
+      ret[d['ifname']] = open('/sys/class/net/%s/address' % d['realif'],'r').read().strip()
     return ret
 
   def _update_latency(self):

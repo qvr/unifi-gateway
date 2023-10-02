@@ -19,8 +19,8 @@ def uptime():
 
 def get_if_table(data, ports):
     if_list = [ d['ifname'] for d in ports ]
-    lan_if = [ d['ifname'] for d in ports if d['name'].lower() == 'lan' ][0]
-    wan_if = [ d['ifname'] for d in ports if d['name'].lower() == 'wan' ][0]
+    lan_if = [ d['ifname'] for d in ports if d['type'].lower() == 'lan' ][0]
+    wan_if = [ d['ifname'] for d in ports if d['type'].lower() == 'wan' ][0]
     if_table = []
 
     if_data = data['ifstat']
@@ -39,12 +39,14 @@ def get_if_table(data, ports):
                  'netmask': data['ip'][iface]['netmask'],
                  'num_port': 1,
                  'rx_bytes': info["rx_bytes"],
+                 'rx_bps': info["rx_bps"],
                  'rx_dropped': info["rx_dropped"],
                  'rx_errors': info["rx_errors"],
                  'rx_multicast': info["rx_multicast"],
                  'rx_packets': info["rx_packets"],
                  'speed': 1000,
                  'tx_bytes': info["tx_bytes"],
+                 'tx_bps': info["tx_bps"],
                  'tx_dropped': info["tx_dropped"],
                  'tx_errors': info["tx_errors"],
                  'tx_packets': info["tx_packets"],
@@ -66,8 +68,8 @@ def get_if_table(data, ports):
 
 def get_network_table(data, ports):
     if_list = [ d['ifname'] for d in ports ]
-    lan_if = [ d['ifname'] for d in ports if d['name'].lower() == 'lan' ][0]
-    wan_if = [ d['ifname'] for d in ports if d['name'].lower() == 'wan' ][0]
+    lan_if = [ d['ifname'] for d in ports if d['type'].lower() == 'lan' ][0]
+    wan_if = [ d['ifname'] for d in ports if d['type'].lower() == 'wan' ][0]
     network_table = []
 
     for iface in if_list:
@@ -100,13 +102,13 @@ def get_net_stats(data,iface):
     if_stat = data['ifstat'][iface]
     return {
                      'multicast': if_stat['rx_multicast'],
-#                     'rx_bps': '342',
+                     'rx_bps': if_stat['rx_bps'],
                      'rx_bytes': if_stat['rx_bytes'],
                      'rx_dropped': if_stat['rx_dropped'],
                      'rx_errors': if_stat['rx_errors'],
                      'rx_multicast': if_stat['rx_multicast'],
                      'rx_packets': if_stat['rx_packets'],
-#                     'tx_bps': '250',
+                     'tx_bps': if_stat['tx_bps'],
                      'tx_bytes': if_stat['tx_bytes'],
                      'tx_dropped': if_stat['tx_dropped'],
                      'tx_errors': if_stat['tx_errors'],
