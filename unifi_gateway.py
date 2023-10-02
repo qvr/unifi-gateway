@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
-import ConfigParser
+import configparser
 import argparse
 import logging.handlers
 import socket
 import time
-import urllib2
+import urllib.request
+import urllib.error
 
 import datacollector
 
@@ -25,7 +26,7 @@ class UnifiGateway(Daemon):
 
     def __init__(self, **kwargs):
         self.interval = 10
-        self.config = ConfigParser.RawConfigParser()
+        self.config = configparser.RawConfigParser()
         self.config.read(CONFIG_FILE)
         self.datacollector = datacollector.DataCollector(self.config)
 
@@ -62,26 +63,27 @@ class UnifiGateway(Daemon):
               # speed-test
               # set-locate
               # unset-locate
-	    elif response['_type'] == 'upgrade':
-	      logger.info('Received upgrade request to version {}'.format(response['version']))
-	      if response['version'] != self.config.get('gateway', 'firmware'):
-	        self.config.set('gateway', 'previous_firmware', self.config.get('gateway', 'firmware'))
-	        self.config.set('gateway', 'firmware', response['version'])
+            elif response['_type'] == 'upgrade':
+              logger.info('Received upgrade request to version {}'.format(response['version']))
+              if response['version'] != self.config.get('gateway', 'firmware'):
+                self.config.set('gateway', 'previous_firmware', self.config.get('gateway', 'firmware'))
+                self.config.set('gateway', 'firmware', response['version'])
                 self._save_config()
-		logger.info('New version information stored')
+                logger.info('New version information stored')
             elif response['_type'] == 'setdefault':
               logger.critical('Controller requested device reset, removing authkey and adopted state')
               self.config.set('gateway', 'is_adopted', False)
               self.config.set('gateway', 'key', None)
+              self.config.set('gateway', 'use_aes_gcm', False)
               self._save_config()
               break
             elif response['_type'] == 'httperror':
               pass
-	    elif response['_type'] == 'urlerror':
-	      logger.error('Connection error to controller, retry in 60 seconds: {}'.format(response['msg']))
-	      self.interval = 60
+            elif response['_type'] == 'urlerror':
+              logger.error('Connection error to controller, retry in 60 seconds: {}'.format(response['msg']))
+              self.interval = 60
             else:
-              logger.warn('Unhandled response type')
+              logger.warning('Unhandled response type ' + response['_type'])
             time.sleep(self.interval)
 
     def _send_broadcast(self, broadcast_index):
@@ -108,9 +110,9 @@ class UnifiGateway(Daemon):
           if response['code'] == '400':
             logger.error('Authentication to controller failed, indicates wrong authkey, device removed from controller?')
             return
-	if response['_type'] == 'urlerror':
-	  logger.error('Connection error to controller: {}'.format(response['msg']))
-	  return
+          if response['_type'] == 'urlerror':
+            logger.error('Connection error to controller: {}'.format(response['msg']))
+            return
 
         if response['_type'] == 'setparam':
             if not self.config.getboolean('gateway', 'is_adopted'):
@@ -129,27 +131,33 @@ class UnifiGateway(Daemon):
           s = row.split('=')
           if s[0] == 'cfgversion':
             self.config.set('provisioned', 'cfgversion', s[1])
+          if s[0] == 'mgmt_url':
+            self.config.set('provisioned', 'mgmt_url', s[1])
           if s[0] == 'authkey':
             logger.debug('setting new device authkey received in mgmt_cfg')
             self.config.set('provisioned', 'key', s[1])
             self.config.set('gateway', 'key', s[1])
+          if s[0] == 'use_aes_gcm' and not self.config.getboolean('gateway', 'use_aes_gcm'):
+            self.config.set('gateway', 'use_aes_gcm', True)
+            logger.debug('setting encryption to AES.GCM')
 
-
-    def _send_inform(self, data):
+    def _send_inform(self, data, encryption='CBC'):
         headers = {
+            'Accept': '*/*',
             'Content-Type': 'application/x-binary',
-            'User-Agent': 'AirControl Agent v1.0'
+            'User-Agent': 'AirControl Agent v1.0',
+            'Expect': '100-continue'         
         }
         url = self.config.get('gateway', 'url')
 
-        request = urllib2.Request(url, encode_inform(self.config, data), headers)
+        request = urllib.request.Request(url, encode_inform(self.config, data, encryption=encryption), headers)
         logger.debug('Send inform request to {} : {}'.format(url, data))
         try:
-          response = urllib2.urlopen(request)
-        except urllib2.HTTPError, e:
-          return { '_type': 'httperror', 'code': str(e.code), 'msg': e.msg }
-	except urllib2.URLError as e:
-	  return { '_type': 'urlerror', 'msg': e.msg }
+          response = urllib.request.urlopen(request)
+        except urllib.error.HTTPError as e:
+          return { '_type': 'httperror', 'code': str(e.code), 'msg': str(e.reason) }
+        except urllib.error.URLError as e:
+          return { '_type': 'urlerror', 'msg': str(e.reason) }
         return decode_inform(self.config, response.read())
 
     def _save_config(self):

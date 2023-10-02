@@ -8,6 +8,7 @@ The goal of this daemon is to simulate a UGW router to the Unifi controller so y
 
 First change conf/unifi-gateway.conf to yours
 ```bash
+ports (map realif to your real interfaces)
 lan_ip = 192.168.4.1
 lan_mac = 0a:0a:0a:0a:0a:0a
 ```
